@@ -8,10 +8,9 @@ import helpers.system_interaction as sys_inter
 from helpers.timer import Timer
 
 parser = argparse.ArgumentParser(description='calculate execution time of imports')
-parser.add_argument('-d', '--directory',
+parser.add_argument('-directory',
                     type=str,
-                    help='search directory (default: current directory)',
-                    default='.')
+                    help='search directory, always requires full path')
 
 args = parser.parse_args()
 
@@ -22,16 +21,18 @@ class ImportTimeChecker:
 
     """
 
-    def __init__(self, dir_name):
+    def __init__(self, dir_path):
         """
-        :param dir_name: directory name to search python files
+        :param dir_path: directory name to search python files
         """
-        self.dir_name = dir_name
+        self.dir_path = dir_path
         self.checked_modules = {}
         """ store all the modules with execution time (module: elapsed_time) """
+        self.not_found_imports = []
+        """ modules that cannot found """
         self.timer = Timer()
         """ instance of class for measure elapsed time """
-        self.match_pattern = '(?m)^\s*(?:from|import)\s+([a-zA-Z0-9_.]+(?:\s*,\s*\w+)*)'
+        self.match_pattern = '(?m)^(?:from|import)\s+([a-zA-Z0-9_.]+(?:\s*,\s*\w+)*)'
         """ pattern for finding modules in file """
 
     def find_modules_from_file(self, file_name: str) -> List[str]:
@@ -52,10 +53,16 @@ class ImportTimeChecker:
         :return: elapsed time to execute import
         """
         if module not in self.checked_modules:
-            self.timer.resume()
-            sys_inter.system(f'python -c "import {module}"')
-            """ execute python "import module" to measure """
-            self.timer.stop()
+            try:
+                self.timer.resume()
+                sys_inter.system(f'export PYTHONPATH=$PYTHONPATH:{self.dir_path};'
+                                 f'python -c "import {module}"')
+                """ set python path in order python can find modules
+                    execute python "import module" to measure """
+                self.timer.stop()
+            except RuntimeError:
+                self.not_found_imports.append(module)
+
             elapsed_time = round(self.timer.get_elapsed(), 3)
             self.checked_modules[module] = elapsed_time
         return self.checked_modules[module]
@@ -65,11 +72,11 @@ class ImportTimeChecker:
         Traverse files and directory and find all modules and measure execution time
         :return: None
         """
-        file_names = io_.find_files(self.dir_name, '*.py')
-        for file_name in file_names:
-            print(f'filename: {file_name}')
+        file_names = io_.find_files(self.dir_path, '*.py')
+        for file_name in tqdm(file_names):
+            # print(f'filename: {file_name}')
             modules = self.find_modules_from_file(file_name)
-            for module in tqdm(modules):
+            for module in modules:
                 self.measure_time(module)
 
     def _sort_by_time(self) -> None:
@@ -120,3 +127,4 @@ if __name__ == '__main__':
 
     total_time = checker.get_total_time()
     print(f'Total time for importing: {total_time}')
+    print(f'modules that cannot import: {checker.not_found_imports}')
