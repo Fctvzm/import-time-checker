@@ -9,6 +9,13 @@ Always give absolute path to project
 ```python
 python execute_imports.py -d /home/user/dir_project
 ```
+Also you can specify path to enviroment activation file
+
+```python
+# Example
+python execute_imports.py -d /home/user/dir_project -e /home/user/.env/bin/activate
+```
+
 ## Output
 
 in ascending order of execution 
