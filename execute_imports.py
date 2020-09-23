@@ -13,7 +13,11 @@ parser = argparse.ArgumentParser(description='calculate execution time of import
 parser.add_argument('-directory',
                     type=str,
                     required=True,
-                    help='search directory, always requires absolute path')
+                    help='absolute path to search directory, always requires absolute path')
+parser.add_argument('-e',
+                    '--env_path',
+                    type=str,
+                    help='absolute path to environment activate file')
 
 args = parser.parse_args()
 
@@ -24,11 +28,13 @@ class ImportTimeChecker:
 
     """
 
-    def __init__(self, dir_path):
+    def __init__(self, root_dir_path, env_file_path=None):
         """
         :param dir_path: directory name to search python files
+        :param env_file_path: path to env activate file
         """
-        self.dir_path = dir_path
+        self.dir_path = root_dir_path
+        self.env_file_path = env_file_path
         self.checked_modules = {}
         """ store all the modules with execution time (module: elapsed_time) """
         self.not_found_imports = []
@@ -57,11 +63,17 @@ class ImportTimeChecker:
         """
         if module not in self.checked_modules:
             try:
+                cmd = f'export PYTHONPATH=$PYTHONPATH:{self.dir_path};'
+                """ set python path in order python can find modules """
+
+                if self.env_file_path:
+                    cmd += f'source {self.env_file_path};'
+                    """ activates environment"""
+
+                cmd += f'python -c "import {module}"'
+                """ execute python "import module" to measure """
                 self.timer.resume()
-                sys_inter.system(f'export PYTHONPATH=$PYTHONPATH:{self.dir_path};'
-                                 f'python -c "import {module}"')
-                """ set python path in order python can find modules
-                    execute python "import module" to measure """
+                sys_inter.system(cmd)
                 self.timer.stop()
             except RuntimeError:
                 self.not_found_imports.append(module)
@@ -126,7 +138,12 @@ if __name__ == '__main__':
     dbg.dassert(os.path.isabs(dir_path), msg=f'{dir_path} is not a absolute path to directory')
     dbg.dassert_dir_exists(dir_path)
 
-    checker = ImportTimeChecker(dir_path)
+    env_path = args.env_path
+    if env_path:
+        dbg.dassert(os.path.isabs(dir_path), msg=f'{env_path} is not a absolute path to env activate file')
+        dbg.dassert_exists(env_path)
+
+    checker = ImportTimeChecker(dir_path, env_path)
     checker.measure_time_for_all_modules()
     checker.print_modules_time(sort=True)
 
