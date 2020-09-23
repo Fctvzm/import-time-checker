@@ -1,16 +1,19 @@
 import argparse
 import re
+import os
 from typing import List, Tuple
 from tqdm import tqdm
 
 import helpers.io_ as io_
 import helpers.system_interaction as sys_inter
+import helpers.dbg as dbg
 from helpers.timer import Timer
 
 parser = argparse.ArgumentParser(description='calculate execution time of imports')
 parser.add_argument('-directory',
                     type=str,
-                    help='search directory, always requires full path')
+                    required=True,
+                    help='search directory, always requires absolute path')
 
 args = parser.parse_args()
 
@@ -119,12 +122,14 @@ class ImportTimeChecker:
 
 
 if __name__ == '__main__':
-    directory = args.directory
+    dir_path = args.directory
+    dbg.dassert(os.path.isabs(dir_path), msg=f'{dir_path} is not a absolute path to directory')
+    dbg.dassert_dir_exists(dir_path)
 
-    checker = ImportTimeChecker(directory)
+    checker = ImportTimeChecker(dir_path)
     checker.measure_time_for_all_modules()
     checker.print_modules_time(sort=True)
 
-    total_time = checker.get_total_time()
+    total_time = round(checker.get_total_time(), 3)
     print(f'Total time for importing: {total_time}')
     print(f'modules that cannot import: {checker.not_found_imports}')
